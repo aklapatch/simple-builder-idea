@@ -18,42 +18,40 @@ The goal is basically to be a `makepkg`-like package builder for Linux-like syst
 
 ## recipe format
 ```bash
-#!/bin/bash
-pkgname="src_name"
-pkgver="0.1.1"
-pkgrev='1'
-pkgdesc='An example package'
-# put platform here, such as Linux, mingw-etc
-pkgplatform=('platform1' 'platform2')
-license='None'
-url='https://example-url'
+name=lua
+ver=5.4.4
+rev=1
+desc='The Lua interpreter'
+arch=x86_64
+platform=mingw-w64
 
-# Pipes aren't common in Unix file paths, so use them as a separator
-needs=("file|dep-0.2.tar.gz" "git|git-url" "regular-src-0.3.3")
+license=MIT
+url=https://www.lua.org/
+
+needs=()
+
+srcs=("$url/ftp/lua-$ver.tar.gz")
 
 # optional
 buildneeds=()
 
 # sha checksums, leave blank to skip
-needsums=('' '' '')
-
-pre_fetch(){
-    # do stuff before fetching data
-}
-
-prep(){
-    # patch sources if necessary
-}
-
-configure(){
-    # configure package before building
-}
+needsums=('') 
 
 build(){
-    # run the build command
+    cd lua-$ver/
+    make mingw
 }
 
 package(){
-    # install the package into the binary cache dir.
+    cd lua-$ver/
+    make \
+        TO_BIN="lua.exe luac.exe lua*.dll" \
+        TO_LIB="liblua.a" \
+        INSTALL_DATA='cp -d' \
+        INSTALL_TOP=${PKGDST} \
+        INSTALL_INC=${PKGDST}/include/lua5.1 \
+        INSTALL_MAN=${PKGDST}/share/man/man1 \
+        install
 }
 ```

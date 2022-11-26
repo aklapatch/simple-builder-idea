@@ -1,15 +1,16 @@
-pkgname=lua
-pkgver=5.4.4
-pkgrev=1
-pkgdesc='The Lua interpreter'
+name=lua
+ver=5.4.4
+rev=1
+desc='The Lua interpreter'
+arch=x86_64
+platform=mingw-w64
 
 license=MIT
 url=https://www.lua.org/
 
-# Pipes aren't common in Unix file paths, so use them as a separator
 needs=()
 
-srcs=("$url/ftp/lua-$pkgver.tar.gz")
+srcs=("$url/ftp/lua-$ver.tar.gz")
 
 # optional
 buildneeds=()
@@ -18,12 +19,12 @@ buildneeds=()
 needsums=('') 
 
 build(){
-    cd lua-$pkgver/
+    cd lua-$ver/
     make mingw
 }
 
 package(){
-    cd lua-$pkgver/
+    cd lua-$ver/
     make \
         TO_BIN="lua.exe luac.exe lua*.dll" \
         TO_LIB="liblua.a" \

@@ -56,8 +56,8 @@ build_recipe(){
     fi
 
     source $build_recipe
-    local recipe_name="$pkgname-$pkgver"
-    local build_name="$recipe_name-$pkgrev"
+    local recipe_name="$platform-$arch-$name-$ver"
+    local build_name="$recipe_name-$rev"
 
     # Copy the recipe to the recipes dir to save it for later
     if [[ *"$recipe_dir"* != $build_recipe  ]]; then
@@ -88,8 +88,8 @@ build_recipe(){
 
     # fetch sources
     for src in ${srcs[@]}; do
-        # split by | to get the url and the dest file
-        if [[ "$src" != *"|"* ]]; then
+        # Check if this is a url
+        if [[ "$src" == *"://"* ]]; then
 
             # wget the source
             # TODO: add option/test for wget vs curl
@@ -117,7 +117,7 @@ build_recipe(){
 
     local save_dest=$PKGDST.old
     for fn in prep configure build check package; do
-        declare -F $fn && echo "Running $fn()" && log_dump_run logs/log-$fn $fn
+        declare -F $fn && echo -e "\033[1mRunning $fn()\033[0m" && log_dump_run logs/log-$fn $fn
     done
 
     # Write metadata for the build to the dir
@@ -127,6 +127,7 @@ build_recipe(){
     local cfg_sum=`xxhsum -H128 $build_recipe`
     cfg_sum=${cfg_sum/ */}
 
+    echo "Getting file hashes"
     local file_hash_list=`cd $PKGDST && find . -type f -exec xxhsum -H128 {} \\;`
     local bin_hash=`echo "$file_hash_list" | xxhsum -H128 -`
     bin_hash=${bin_hash/ */}
