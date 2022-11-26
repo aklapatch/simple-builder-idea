@@ -13,6 +13,13 @@ mkdir -p $bin_store_dir
 mkdir -p $recipe_dir
 mkdir -p $build_dir
 
+if [[ "$1" == "--clean-builds" ]]; then
+    echo "Cleaning builds from $build_dir"
+    rm -rf $build_dir
+    echo "Done"
+    exit
+fi
+
 # parse the recipe to build. This should be a file path, if not, then search the recipe dir
 recipe=${1?Please provide a recipe path to build}
 recipe=`realpath $recipe`
@@ -23,12 +30,14 @@ if ! [ -f $recipe ]; then
 fi
 #TODO: Search the recipe dir for recipes based on the name given.
 
-# Copy the recipe to the recipes dir to save it for later
-if [[ *"$recipe_dir"* != $recipe  ]]; then
-    echo "Copying $recipe to $recipe_dir"
-    cp $recipe $recipe_dir/
-    recipe=$recipe_dir/`basename $recipe`
-fi
+# Log the command, and dump the command to a script file to replicate it later.
+log_dump_run(){
+    local base=${1?Please provide a log/script base name}
+    local log_file=$base.txt
+    printf "#!/bin/bash\n%s" ${2?Please provide a command} > $base.sh
+    echo "$2" > $log_file
+    eval "$2" | tee -a $log_file
+}
 
 # log the command and run it
 log_run(){
@@ -47,87 +56,93 @@ build_recipe(){
     fi
 
     source $build_recipe
+    local recipe_name="$pkgname-$pkgver"
+    local build_name="$recipe_name-$pkgrev"
+
+    # Copy the recipe to the recipes dir to save it for later
+    if [[ *"$recipe_dir"* != $build_recipe  ]]; then
+        local subdir=$recipe_dir/$recipe_name
+
+        echo "Copying $recipe to $subdir"
+        mkdir -p $subdir
+        cp $recipe $subdir/recipe.sh
+    fi
 
     # check if the needs and build needs are satisfied. If not build them
     for need in ${needs[@]}; do
-        if [[ "$need" != 'system-cc' ]]; then
-            build_recipe $need
-        fi
+        build_recipe $need
     done
 
-    local build_name=`basename $build_recipe`
-    build_name=${build_name/.sh/}
-    local recipe_build_dir=$build_dir/build-$build_name
-    mkdir -p $recipe_build_dir
-    cd $recipe_build_dir
 
-    local build_log_dir=$recipe_build_dir/logs
-    mkdir -p $build_log_dir
+    BUILDDIR=$build_dir/$build_name
+    mkdir -p $BUILDDIR
+    cd $BUILDDIR
 
-    echo "Building in $recipe_build_dir"
+    LOGDIR=$BUILDDIR/logs/
+
+    # clear out the logs and make them again
+    rm -rf $LOGDIR
+    mkdir $LOGDIR
+
+    echo "Building in $BUILDDIR"
 
     # fetch sources
     for src in ${srcs[@]}; do
         # split by | to get the url and the dest file
         if [[ "$src" != *"|"* ]]; then
-            echo "ERROR: bad format for src: '$src'"
+
+            # wget the source
+            # TODO: add option/test for wget vs curl
+            src_file=`basename $src`
+            src_file_out=$src_cache_dir/$src_file
+            if [ -f $src_file_out ]; then
+                echo "Source file $src_file_out exists, skipping download"
+            else
+                echo "Downloading $src_file_out from $src"
+                log_dump_run $LOGDIR/"fetch-$src_file" "wget -O $src_file_out $src"
+            fi
+
+            # Extract the file to the build directory 
+            echo "Extracting $src_file_out to $BUILDDIR"
+            tar -xf $src_file_out
+        else 
+            # TODO: add git and package/recipe fetching/building.
+            echo "ERROR: Other source formats not supported"
             exit 1
         fi
-
-        # wget the source
-        # TODO: add option/test for wget vs curl
-        src_file=${src/|*/}
-        src_file_out=$src_cache_dir/$src_file
-        src_url=${src/*|/}
-        if [ -f $src_file_out ]; then
-            echo "Source file $src_file_out exists, skipping download"
-        else
-            echo "Downloading $src_file_out from $src_url"
-            log_run "fetch-$src_file.txt" "wget -O $src_file_out $src_url"
-        fi
-
-        # Extract the file to the build directory 
-        echo "Extracting $src_file_out to $recipe_build_dir"
-        tar -x -f $src_file_out
-
-        #define variables that the recipe functions will use
-        PKGDST=$bin_store_dir/$build_name
-        BUILDDIR=$recipe_build_dir
-        LOGDIR=$build_log_dir
-
     done
 
-    # run the prep function if it was defined
-    echo "Running prep()"
-    declare -F prep > /dev/null && log_run logs/prep-log.txt prep
+    #define variables that the recipe functions will use
+    PKGDST=`mktemp -d $bin_store_dir/$recipe_name~build^tmp-XXXX`
 
-    # run the configure function
-    echo "Running configure()"
-    declare -F configure && log_run logs/config-log.txt configure
-
-    # build the package
-    echo "Running build()"
-    declare -F build && log_run logs/build-log.txt build
-
-    echo "Running check()"
-    declare -F check && log_run logs/check-log.txt check
-
-    # package the build
-    echo "Running package()"
-    declare -F package && log_run logs/package-log.txt package
+    local save_dest=$PKGDST.old
+    for fn in prep configure build check package; do
+        declare -F $fn && echo "Running $fn()" && log_dump_run logs/log-$fn $fn
+    done
 
     # Write metadata for the build to the dir
     local info_file=$PKGDST/pkg-info.txt
-    echo "name=$build_name" > $info_file
-    echo "date=`date -u`" >> $info_file
+    rm -f $info_file
 
     local cfg_sum=`xxhsum -H128 $build_recipe`
     cfg_sum=${cfg_sum/ */}
-    echo "cfg_sum=$cfg_sum" >> $info_file
 
-    local folder_sum=`cd $PKGDST && tar -c -f - . | xxhsum - -H128`
-    folder_sum=${folder_sum/ */}
-    echo "bin_sum=$folder_sum" >> $info_file
+    local file_hash_list=`cd $PKGDST && find . -type f -exec xxhsum -H128 {} \\;`
+    local bin_hash=`echo "$file_hash_list" | xxhsum -H128 -`
+    bin_hash=${bin_hash/ */}
+    local info_str="name=$build_name\ndate='`date -u -Ins`'\ncfg_sum=$cfg_sum\nbin_sum=$bin_hash\nfile_sums='${file_hash_list[@]}'"
+
+    echo -e "$info_str" > $info_file
+
+    # delete the pkgdst for the old package if there was one
+    old_PKGDST=$bin_store_dir/$recipe_name
+    tmp_PKGDST=${old_PKGDST}-old
+    if [ -d $old_PKGDST ]; then
+        mv -f $old_PKGDST $tmp_PKGDST
+    fi
+    echo "Moving build dir $PKGDST to dest $old_PKGDST"
+    mv -f $PKGDST $old_PKGDST
+    rm -rf $tmp_PKGDST
 }
 
 build_recipe $recipe

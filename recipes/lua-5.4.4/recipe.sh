@@ -4,12 +4,12 @@ pkgrev=1
 pkgdesc='The Lua interpreter'
 
 license=MIT
-url=https://www.lua.org/ftp/lua-5.4.4.tar.gz
+url=https://www.lua.org/
 
 # Pipes aren't common in Unix file paths, so use them as a separator
 needs=()
 
-srcs=("lua.tar.gz|$url")
+srcs=("$url/ftp/lua-$pkgver.tar.gz")
 
 # optional
 buildneeds=()
