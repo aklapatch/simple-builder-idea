@@ -8,15 +8,17 @@ platform=mingw-w64
 license=MIT
 url=https://www.lua.org/
 
-needs=()
+# Environment/Tools needed to run+build the tool
+env=()
+conflicts=()
+
+# Tools only needed to build the package, not run it.
+buildenv=()
 
 srcs=("$url/ftp/lua-$ver.tar.gz")
 
-# optional
-buildneeds=()
-
-# sha checksums, leave blank to skip
-needsums=('') 
+# source sha checksums, leave blank to skip
+srcsums=('') 
 
 build(){
     cd lua-$ver/
