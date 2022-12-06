@@ -159,8 +159,7 @@ build_recipe(){
     mkdir -p $SCRIPTDIR
 
     #define variables that the recipe functions will use
-    local bin_tmp_suffix="~^tmp"
-    PKGDST=$bin_store_dir/"$recipe_name-$bin_tmp_suffix"
+    PKGDST=$BUILDDIR/"$recipe_name-pkgdst"
     rm -rf $PKGDST
     mkdir -p $PKGDST
 
