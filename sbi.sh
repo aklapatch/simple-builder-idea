@@ -38,7 +38,6 @@ elif [[ "$1" == "--see-added" ]]; then
     exit
 fi
 
-
 # parse the recipe to build. This should be a file path, if not, then search the recipe dir
 recipe=${1?Please provide a recipe path to build}
 recipe=`realpath $recipe`
@@ -49,11 +48,38 @@ if ! [ -f $recipe ]; then
 fi
 #TODO: Search the recipe dir for recipes based on the name given.
 
+
+# Dump command as a script, then run it.
+log_run_script(){
+    local log=${1?Please provide a log name}
+    local script=${2?Please provide a script name}
+    local cmd=${3?Please provide a command}
+
+    dump_script $script "$cmd"
+
+    # Run the script we just dumped
+    log_run $log "$script"
+}
+
+# dump the function/command to a script
+dump_script(){
+    local script_file=${1?Please provide a script filename}
+    local cmd=${2?Please provide a command to log}
+    # TODO: add CC, CXX and other environment variables.
+    local script_str='#!/bin/bash\nset -euo pipefail\ncd $(realpath $(dirname $0))/..'
+
+    script_str+="\n$cmd"
+    
+    echo -e "$script_str" > $script_file
+}
+
 # Log the command, and dump the command to a script file to replicate it later.
 log_dump_run(){
     local base=${1?Please provide a log/script base name}
     local log_file=$base.txt
-    printf "#!/bin/bash\n%s" ${2?Please provide a command} > $base.sh
+    local cmd_str="${2?Please provide a command}"
+    local script_str='#!/bin/bash\nset -euo pipefail\ncd $(realpath $(dirname $0))/..'
+    echo -e "$script_str\n$cmd_str"  > $base.sh
     echo "$2" > $log_file
     eval "$2" | tee -a $log_file
 }
@@ -71,13 +97,12 @@ bold_echo(){
 }
 
 build_recipe(){
-    local build_recipe=${1?This function needs a recipe to build}
+    local build_recipe=`realpath ${1?This function needs a recipe to build}`
 
     if ! [ -f $build_recipe ]; then
         echo "ERROR: $build_recipe is not a file"
         exit 1
     fi
-
 
     source $build_recipe
     local recipe_name="$platform-$arch-$name-$ver"
@@ -118,20 +143,26 @@ build_recipe(){
     done
 
     # TODO: add a heuristic that deletes matching build dirs if there's more than 5 of them.
-    BUILDDIR=`mktemp -d $build_dir/$build_name-XXXX`
+    BUILDDIR="$build_dir/$build_name"
+    # Remove the old build dir
+    rm -rf $BUILDDIR
     mkdir -p $BUILDDIR
     cd $BUILDDIR
 
     LOGDIR=$BUILDDIR/logs/
-
     # clear out the logs and make them again
     rm -rf $LOGDIR
     mkdir -p $LOGDIR
+
+    SCRIPTDIR=$BUILDDIR/scripts/
+    rm -rf $SCRIPTDIR
+    mkdir -p $SCRIPTDIR
 
     #define variables that the recipe functions will use
     local bin_tmp_suffix="~^tmp"
     PKGDST=$bin_store_dir/"$recipe_name-$bin_tmp_suffix"
     rm -rf $PKGDST
+    mkdir -p $PKGDST
 
     echo "Building in $BUILDDIR"
 
@@ -162,7 +193,9 @@ build_recipe(){
     done
 
     for fn in prep configure build check package; do
-        declare -F $fn && bold_echo "Running $fn()" && log_dump_run logs/log-$fn $fn
+        declare -F $fn && bold_echo "Running $fn()" && log_run_script logs/log-$fn scripts/run-$fn.sh "export PKGDST=\"$PKGDST\"
+         export BUILDDIR=\"$BUILDDIR\"
+         source $build_recipe && $fn"
     done
 
     # Write metadata for the build to the dir

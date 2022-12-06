@@ -10,10 +10,10 @@ url=https://www.lua.org/
 
 # Environment/Tools needed to run+build the tool
 env=()
-conflicts=()
-
 # Tools only needed to build the package, not run it.
 buildenv=()
+
+conflicts=()
 
 srcs=("$url/ftp/lua-$ver.tar.gz")
 
