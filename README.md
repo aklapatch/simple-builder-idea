@@ -16,6 +16,25 @@ The goal is basically to be a `makepkg`-like package builder for Linux-like syst
 - Allow configuration (like with ~/.config/sbi/sbi.sh)
 - (if necessary) bootstrap a statically linked compiler if necessary
 
+## TODO:
+- implement env
+    - Add PATH entries
+    - bootstrap gcc
+        - mingw
+            - binutils
+            - crt
+            - isl
+            - zlib
+            - zstd
+            - autotools
+            - mpfr
+            - mpc
+            - bash?
+            - make
+- Implement checksum adding through the tool and checksum checking
+- add xxhsum.
+- Add caching for config/build/package, etc.
+
 ## recipe format
 ```bash
 name=lua

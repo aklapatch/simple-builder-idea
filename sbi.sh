@@ -193,7 +193,7 @@ build_recipe(){
     done
 
     for fn in prep configure build check package; do
-        declare -F $fn && bold_echo "Running $fn()" && log_run_script logs/log-$fn scripts/run-$fn.sh "export PKGDST=\"$PKGDST\"
+        declare -F $fn && bold_echo "Running $fn()" && log_run_script logs/log-$fn.txt scripts/run-$fn.sh "export PKGDST=\"$PKGDST\"
          export BUILDDIR=\"$BUILDDIR\"
          source $build_recipe && $fn"
     done
