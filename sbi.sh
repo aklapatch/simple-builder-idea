@@ -37,6 +37,7 @@ elif [[ "$1" == "--see-added" ]]; then
     find . -maxdepth 1 -type d -print
     exit
 fi
+# TODO: add a flag to add a recipe
 
 # parse the recipe to build. This should be a file path, if not, then search the recipe dir
 recipe=${1?Please provide a recipe path to build}
@@ -97,14 +98,21 @@ bold_echo(){
 }
 
 build_recipe(){
-    local build_recipe=`realpath ${1?This function needs a recipe to build}`
+    local recipe_to_build="${1?This function needs a recipe to build}"
+    local return_if_built="${2}"
 
-    if ! [ -f $build_recipe ]; then
-        echo "ERROR: $build_recipe is not a file"
+    # Check if this is a folder in the bin-store, if it is, then don't do a bunch of things
+    if [[ -n "$return_if_built" ]] && [ -d $bin_store_dir/$recipe_to_build ]; then
+        echo "$recipe_to_build is built"
+        return
+        # TODO: search for recipes to build them
+    elif ! [ -f $recipe_to_build ]; then
+        echo "ERROR: $recipe_to_build is not a file"
         exit 1
     fi
+    recipe_to_build=`realpath $recipe_to_build`
 
-    source $build_recipe
+    source $recipe_to_build
     local recipe_name="$platform-$arch-$name-$ver"
     local build_name="$recipe_name-$rev"
 
@@ -128,18 +136,16 @@ build_recipe(){
         done
     fi
 
-    # Copy the recipe to the recipes dir to save it for later
-    if [[ *"$recipe_dir"* != $build_recipe  ]]; then
-        local subdir=$recipe_dir/$recipe_name
-
-        echo "Copying $recipe to $subdir"
-        mkdir -p $subdir
-        cp $recipe $subdir/recipe.sh
-    fi
-
     # check if the needs and build needs are satisfied. If not build them
-    for need in ${env[@]}; do
-        build_recipe $need
+    for need in ${runenv[@]}; do
+        echo "Building $need"
+        (build_recipe $need true)
+    done
+
+    # build the build needs too
+    for need in ${buildenv[@]}; do
+        echo "Building $need"
+        (build_recipe $need true)
     done
 
     # TODO: add a heuristic that deletes matching build dirs if there's more than 5 of them.
@@ -148,6 +154,38 @@ build_recipe(){
     rm -rf $BUILDDIR
     mkdir -p $BUILDDIR
     cd $BUILDDIR
+
+    # symlink the items in both the env and buildenv sections
+    ENVDIR=$BUILDDIR/env
+    mkdir -p $ENVDIR
+
+    for need in ${buildenv[@]}; do
+        echo "Adding $need to env"
+        local srcdir=$bin_store_dir/$need
+        local env_files=(`cd $srcdir && find . -type f ! -name "*pkg-info.txt" -print`)
+        for env_file in ${env_files[@]}; do
+            # link the files
+            local destfile=$ENVDIR/$env_file
+            local srcfile=$srcdir/$env_file
+            echo "Linking $srcfile to $destfile"
+            mkdir -p `dirname $destfile`
+            ln $srcfile $destfile
+        done
+    done
+
+    for need in ${runenv[@]}; do
+        echo "Adding $need to env"
+        local srcdir=$bin_store_dir/$need
+        local env_files=(`cd $srcdir && find . -type f ! -name "*pkg-info.txt" -print`)
+        for env_file in ${env_files[@]}; do
+            # link the files
+            local destfile=$ENVDIR/$env_file
+            local srcfile=$srcdir/$env_file
+            echo "Linking $srcfile to $destfile"
+            mkdir -p `dirname $destfile`
+            ln $srcfile $destfile
+        done
+    done
 
     LOGDIR=$BUILDDIR/logs/
     # clear out the logs and make them again
@@ -194,14 +232,15 @@ build_recipe(){
     for fn in prep configure build check package; do
         declare -F $fn && bold_echo "Running $fn()" && log_run_script logs/log-$fn.txt scripts/run-$fn.sh "export PKGDST=\"$PKGDST\"
          export BUILDDIR=\"$BUILDDIR\"
-         source $build_recipe && $fn"
+         export ENVDIR=\"$ENVDIR\"
+         source $recipe_to_build && $fn"
     done
 
     # Write metadata for the build to the dir
     local info_file=$PKGDST/pkg-info.txt
     rm -f $info_file
 
-    local cfg_sum=`xxhsum -H128 $build_recipe`
+    local cfg_sum=`xxhsum -H128 $recipe_to_build`
     cfg_sum=${cfg_sum/ */}
 
     echo "Getting file hashes"
@@ -228,4 +267,4 @@ build_recipe(){
     rm -rf $BUILDDIR
 }
 
-build_recipe $recipe
+build_recipe $recipe ""
