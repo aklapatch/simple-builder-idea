@@ -77,7 +77,7 @@ elif [[ "$1" == "--add-recipe" ]]; then
 fi
 
 # parse the recipe to build. This should be a file path, if not, then search the recipe dir
-local recipe=${1?Please provide a recipe path to build}
+recipe=${1?Please provide a recipe path to build}
 recipe=`realpath $recipe`
 
 if ! [ -f $recipe ]; then

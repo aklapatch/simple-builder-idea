@@ -30,6 +30,12 @@ build(){
     make -j `nproc`
 }
 
+check(){
+    cd $name-$ver/
+    #make -j `nproc` test
+}
+
+
 package(){
     cd $name-$ver/
     make -j `nproc` install
