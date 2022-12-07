@@ -255,8 +255,13 @@ build_recipe(){
             fi
 
             # Extract the file to the build directory 
+            # unzip if this is a zip file
             echo "Extracting $src_file_out to $BUILDDIR"
-            tar -xf $src_file_out
+            if [[ $src_file_out == *".zip" ]]; then
+                unzip $src_file_out -d $BUILDDIR
+            else
+                tar -xf $src_file_out
+            fi
         else 
             # TODO: add git and package/recipe fetching/building.
             echo "ERROR: Other source formats not supported"
