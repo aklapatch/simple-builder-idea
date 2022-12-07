@@ -36,11 +36,48 @@ elif [[ "$1" == "--see-added" ]]; then
     cd $bin_store_dir
     find . -maxdepth 1 -type d -print
     exit
+elif [[ "$1" == "--add-recipe" ]]; then
+    # Source the recipe, and add it to the built-in recipe dir
+    local recipe="${2?Please provide a recipe path to import}"
+    if ! [ -f $recipe ]; then
+        echo "ERROR: $recipe is not a file we can copy"
+        exit 1
+    fi
+
+    # Get the recipe name and make a folder for it.
+    source $recipe
+    local recipe_name="$platform-$arch-$name-$ver"
+
+    # Ask if we should replace a detected recipe
+    local old_PKGDST=$bin_store_dir/$recipe_name
+    if [ -d $old_PKGDST ]; then
+        while true 
+        do
+            read -p "Found old package version at $old_PKGDST. Replace? (y/n): " -n 1 replace_answer
+            echo
+            case "$replace_answer" in 
+                n|no)
+                    bold_echo Halting
+                    # Just stop
+                    exit 0;;
+                y|yes)
+                    break;;
+                *)
+                    echo "Please input y/n/yes/no"
+            esac
+        done
+    fi
+
+    mkdir -p $old_PKGDST/
+    local recipe_dst="$old_PKGDST/recipe.sh"
+    echo "Copying $recipe to $recipe_dst"
+    cp $recipe $recipe_dst
+    bold_echo Done
+    exit 0
 fi
-# TODO: add a flag to add a recipe
 
 # parse the recipe to build. This should be a file path, if not, then search the recipe dir
-recipe=${1?Please provide a recipe path to build}
+local recipe=${1?Please provide a recipe path to build}
 recipe=`realpath $recipe`
 
 if ! [ -f $recipe ]; then
@@ -167,9 +204,8 @@ build_recipe(){
             # link the files
             local destfile=$ENVDIR/$env_file
             local srcfile=$srcdir/$env_file
-            echo "Linking $srcfile to $destfile"
             mkdir -p `dirname $destfile`
-            ln $srcfile $destfile
+            ln -f $srcfile $destfile
         done
     done
 
@@ -181,9 +217,8 @@ build_recipe(){
             # link the files
             local destfile=$ENVDIR/$env_file
             local srcfile=$srcdir/$env_file
-            echo "Linking $srcfile to $destfile"
             mkdir -p `dirname $destfile`
-            ln $srcfile $destfile
+            ln -f $srcfile $destfile
         done
     done
 
