@@ -200,7 +200,7 @@ build_recipe(){
             local destfile=$ENVDIR/$env_file
             local srcfile=$srcdir/$env_file
             mkdir -p `dirname $destfile`
-            ln -f $srcfile $destfile
+            ln -s -f $srcfile $destfile
         done
     done
 
