@@ -13,32 +13,34 @@ mkdir -p $bin_store_dir
 mkdir -p $recipe_dir
 mkdir -p $build_dir
 
-if [[ "$1" == "--clean-builds" ]]; then
+clean_builds(){
     echo "Cleaning builds from $build_dir"
     rm -rf $build_dir
-    echo "Done"
-    exit
-elif [[ "$1" == "--drop" ]]; then
-    # Delete the next argument from the bin-store
-    # TODO: implement dependency checking + removal
-    local delete_me=$bin_store_dir/${2?Please provide a package to drop!}
+    echo "Finished cleaning builds"
+}
+
+# TODO: implement dependency checking + removal
+drop_pkg(){
+    local delete_me=$bin_store_dir/${1?Please provide a package to drop!}
     if [ -d $delete_me ]; then
-        echo "Removing $2"
+        echo "Removing $1"
         rm -rf  $delete_me
-        exit
+        echo "Removed $1"
     else
-        echo "$2 Not installed!"
+        echo "$1 Not installed!"
         exit 1
     fi
-elif [[ "$1" == "--see-added" ]]; then
-    # print added packages
+}
+
+print_added(){
     # Print everything in the bin-store
     cd $bin_store_dir
     find . -maxdepth 1 -type d -print
-    exit
-elif [[ "$1" == "--add-recipe" ]]; then
+}
+
+import_recipe(){
     # Source the recipe, and add it to the built-in recipe dir
-    local recipe="${2?Please provide a recipe path to import}"
+    local recipe="${1?Please provide a recipe path to import}"
     if ! [ -f $recipe ]; then
         echo "ERROR: $recipe is not a file we can copy"
         exit 1
@@ -49,11 +51,11 @@ elif [[ "$1" == "--add-recipe" ]]; then
     local recipe_name="$platform-$arch-$name-$ver"
 
     # Ask if we should replace a detected recipe
-    local old_PKGDST=$bin_store_dir/$recipe_name
-    if [ -d $old_PKGDST ]; then
+    local old_recipe=$recipe_dir/$recipe_name/recipe.sh
+    if [ -f $old_recipe ]; then
         while true 
         do
-            read -p "Found old package version at $old_PKGDST. Replace? (y/n): " -n 1 replace_answer
+            read -p "Found old package version at $old_recipe. Replace? (y/n): " -n 1 replace_answer
             echo
             case "$replace_answer" in 
                 n|no)
@@ -68,24 +70,13 @@ elif [[ "$1" == "--add-recipe" ]]; then
         done
     fi
 
-    mkdir -p $old_PKGDST/
-    local recipe_dst="$old_PKGDST/recipe.sh"
-    echo "Copying $recipe to $recipe_dst"
-    cp $recipe $recipe_dst
-    bold_echo Done
-    exit 0
-fi
-
-# parse the recipe to build. This should be a file path, if not, then search the recipe dir
-recipe=${1?Please provide a recipe path to build}
-recipe=`realpath $recipe`
-
-if ! [ -f $recipe ]; then
-    echo "ERROR: $recipe is not a file"
-    exit 1
-fi
-#TODO: Search the recipe dir for recipes based on the name given.
-
+    # TODO: add local file sources from recipe to this dir too
+    # TODO: delete all files in the old recipe dir
+    mkdir -p `dirname $old_recipe`
+    echo "Copying $recipe to $old_recipe"
+    cp $recipe $old_recipe
+    bold_echo "Copied recipe"
+}
 
 # Dump command as a script, then run it.
 log_run_script(){
@@ -142,11 +133,15 @@ build_recipe(){
     if [[ -n "$return_if_built" ]] && [ -d $bin_store_dir/$recipe_to_build ]; then
         echo "$recipe_to_build is built"
         return
-        # TODO: search for recipes to build them
-    elif ! [ -f $recipe_to_build ]; then
-        echo "ERROR: $recipe_to_build is not a file"
-        exit 1
+    elif [ -f $recipe_dir/$recipe_to_build/recipe.sh ]; then
+        echo "Using stored recipe"
+        recipe_to_build=$recipe_dir/$recipe_to_build/recipe.sh
+    elif [ -f $recipe_to_build ]; then
+        echo "Using recipe file"
+    else
+        echo "ERROR: $recipe_to_build is not a file or a stored recipe"
     fi
+
     recipe_to_build=`realpath $recipe_to_build`
 
     source $recipe_to_build
@@ -307,4 +302,49 @@ build_recipe(){
     rm -rf $BUILDDIR
 }
 
-build_recipe $recipe ""
+usage(){
+    local script_name=${1?Please provide a script name}
+    echo "Usage: $script_name [OPTION] [ARG]"
+    echo "OPTIONS:"
+    echo "  --clean-builds"
+    echo "      Removes builds from $build_dir"
+    echo "  --drop <pkg-name>"
+    echo "      Removes <pkg-name> from $bin_store_dir"
+    echo "  --see-added"
+    echo "      Prints available packages"
+    echo "  --import-recipe <recipe-path>    "
+    echo "      Imports <recipe-path> into the installed recipes"
+    echo "  --add <pkg-name>"
+    echo "      Adds <pkg-name> to the build store if the build succeeds"
+    echo "  --help"
+    echo "      Shows this help"
+}
+
+filename=`basename $0`
+# Parse args and run stuff.
+while [ $# -gt 0 ]; do
+    if [[ "$1" == "--clean-builds" ]]; then
+        clean_builds
+    elif [[ "$1" == "--drop" ]]; then
+        # Delete the next argument from the bin-store
+        shift
+        drop_pkg $1
+    elif [[ "$1" == "--see-added" ]]; then
+        # print added packages
+        print_added
+    elif [[ "$1" == "--import-recipe" ]]; then
+        shift
+        import_recipe $1
+    elif [[ "$1" == "--add" ]]; then
+        shift
+        build_recipe $1 ""
+    elif [[ "$1" == "--help" ]]; then
+        usage $filename
+        exit
+    else
+        echo "ERROR: Unrecognized arg $1"
+        exit 1
+    fi
+    shift
+done
+exit

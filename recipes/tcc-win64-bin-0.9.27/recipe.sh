@@ -1,10 +1,10 @@
 _name=tcc
-name=$_name-win64-bin
+name=$_name-bin
 ver=0.9.27
 rev=1
 desc=''
 arch=x86_64
-platform=mingw-w64
+platform=win64
 
 license=
 url=http://download.savannah.gnu.org/releases/tinycc/
