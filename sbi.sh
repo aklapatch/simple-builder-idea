@@ -118,7 +118,7 @@ log_run(){
     # 1 is log file 2 is cmd
     local log_file=${1?Please provide a log name}
     echo "${2?Please provide a command}" > "$log_file"
-    eval "$2" | tee -a $log_file
+    bash "$2" | tee -a $log_file
 }
 
 bold_echo(){
@@ -275,12 +275,12 @@ build_recipe(){
     local info_file=$PKGDST/pkg-info.txt
     rm -f $info_file
 
-    local cfg_sum=`xxhsum -H128 $recipe_to_build`
+    local cfg_sum=`sha256sum $recipe_to_build`
     cfg_sum=${cfg_sum/ */}
 
     echo "Getting file hashes"
-    local file_hash_list=`cd $PKGDST && find . -type f -exec xxhsum -H128 {} \\;`
-    local bin_hash=`echo "$file_hash_list" | xxhsum -H128 -`
+    local file_hash_list=`cd $PKGDST && find . -type f -exec sha256sum {} \\;`
+    local bin_hash=`echo "$file_hash_list" | sha256sum -`
     bin_hash=${bin_hash/ */}
     local info_str="name=$build_name\ndate='`date -u -Ins`'\ncfg_sum=$cfg_sum\nbin_sum=$bin_hash\nfile_sums='${file_hash_list[@]}'"
 

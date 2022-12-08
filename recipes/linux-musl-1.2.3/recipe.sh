@@ -3,7 +3,7 @@ ver=1.2.3
 rev=1
 desc=''
 arch=x86_64
-platform=mingw-w64
+platform=linux
 
 license=
 url=https://musl.libc.org/releases/
@@ -22,7 +22,7 @@ srcsums=('')
 
 configure(){
     cd $name-$ver/
-    ./configure CC=gcc --prefix=$PKGDST --enable-static --target=x86_64
+    ./configure --prefix=$PKGDST --enable-static
 }
 
 build(){
