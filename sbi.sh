@@ -1,15 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
+# TODO: add m4 as a need for gmp 5.0.1
+# TODO: add m4 and autotools and make for this project
+
 # Make the binary cache/src dir and the store dir
 src_cache_dir=$HOME/.sbi/src-cache/
 bin_store_dir=$HOME/.sbi/bin-store/
+# When a build finishes, put a symlink in here to indicate that it's a ready to use package
+pkg_link_dir=$HOME/.sbi/bin-store/pkg-link-dir
 recipe_dir=$HOME/.sbi/recipes/
 build_dir=$HOME/.sbi/builds/
 config_file=$HOME/.sbi/sbi_cfg.sh
 
+# TODO: change the design to have a pkg folder where a symlink will get added when a build finishes
+# The install dir will probably still be the bin_store_dir
+
 mkdir -p $src_cache_dir
 mkdir -p $bin_store_dir
+mkdir -p $pkg_link_dir
 mkdir -p $recipe_dir
 mkdir -p $build_dir
 
@@ -21,10 +30,11 @@ clean_builds(){
 
 # TODO: implement dependency checking + removal
 drop_pkg(){
-    local delete_me=$bin_store_dir/${1?Please provide a package to drop!}
+    local delete_me=$pkg_link_dir/${1?Please provide a package to drop!}
     if [ -d $delete_me ]; then
         echo "Removing $1"
-        rm -rf  $delete_me
+        # remove the source and dest of the symlink
+        rm -rf `realpath $delete_me` $delete_me
         echo "Removed $1"
     else
         echo "$1 Not installed!"
@@ -34,8 +44,8 @@ drop_pkg(){
 
 print_added(){
     # Print everything in the bin-store
-    cd $bin_store_dir
-    find . -maxdepth 1 -type d -print
+    cd $pkg_link_dir
+    find . -maxdepth 1 -print
 }
 
 import_recipe(){
@@ -48,7 +58,7 @@ import_recipe(){
 
     # Get the recipe name and make a folder for it.
     source $recipe
-    local recipe_name="$platform-$arch-$name-$ver"
+    local recipe_name="$arch-$platform-$name-$ver"
 
     # Ask if we should replace a detected recipe
     local old_recipe=$recipe_dir/$recipe_name/recipe.sh
@@ -72,9 +82,7 @@ import_recipe(){
 
     # TODO: add local file sources from recipe to this dir too
     # TODO: delete all files in the old recipe dir
-    mkdir -p `dirname $old_recipe`
-    echo "Copying $recipe to $old_recipe"
-    cp $recipe $old_recipe
+    install -D $recipe $old_recipe
     bold_echo "Copied recipe"
 }
 
@@ -125,12 +133,19 @@ bold_echo(){
     echo -e "\033[1m${1}\033[0m"
 }
 
+pkg_is_built(){
+    if [ -d $pkg_link_dir/${1?Please provide a package name to check} ]; then
+        return 0
+    fi
+    return 1
+}
+
 build_recipe(){
     local recipe_to_build="${1?This function needs a recipe to build}"
     local return_if_built="${2}"
 
     # Check if this is a folder in the bin-store, if it is, then don't do a bunch of things
-    if [[ -n "$return_if_built" ]] && [ -d $bin_store_dir/$recipe_to_build ]; then
+    if [[ -n "$return_if_built" ]] && pkg_is_built $recipe_to_build; then
         echo "$recipe_to_build is built"
         return
     elif [ -f $recipe_dir/$recipe_to_build/recipe.sh ]; then
@@ -145,15 +160,16 @@ build_recipe(){
     recipe_to_build=`realpath $recipe_to_build`
 
     source $recipe_to_build
-    local recipe_name="$platform-$arch-$name-$ver"
+    local recipe_name="$arch-$platform-$name-$ver"
     local build_name="$recipe_name-$rev"
 
     # Ask if we should replace a detected recipe
-    old_PKGDST=$bin_store_dir/$recipe_name
-    if [ -d $old_PKGDST ]; then
+    local replacing=""
+    local pkg_backup_dir=$bin_store_dir/$recipe_name-backup/
+    if pkg_is_built $recipe_name; then
         while true 
         do
-            read -p "Found old package version at $old_PKGDST. Replace? (y/n): " -n 1 replace_answer
+            read -p "Found old package version at $recipe_name . Replace? (y/n): " -n 1 replace_answer
             echo
             case "$replace_answer" in 
                 n|no)
@@ -166,15 +182,24 @@ build_recipe(){
                     echo "Please input y/n/yes/no"
             esac
         done
+        replacing=true
+        # We need to move the contents somewhere so they can be recovered later. Keep them in their dir through
+        mv -f $bin_store_dir/$recipe_name $pkg_backup_dir
+        # remove the pkg_link_dir symlink too in case something goes wrong
+        rm -rf $pkg_link_dir/$recipe_name
+
+        # TODO: add a trap to revert this if it doesn't work
     fi
 
     # check if the needs and build needs are satisfied. If not build them
+    local test_len=${#runenv[@]}
     for need in ${runenv[@]}; do
         echo "Building $need"
         (build_recipe $need true)
     done
 
     # build the build needs too
+    local test_len=${#buildenv[@]}
     for need in ${buildenv[@]}; do
         echo "Building $need"
         (build_recipe $need true)
@@ -193,27 +218,27 @@ build_recipe(){
 
     for need in ${buildenv[@]}; do
         echo "Adding $need to env"
-        local srcdir=$bin_store_dir/$need
+        local srcdir=`realpath $pkg_link_dir/$need`
         local env_files=(`cd $srcdir && find . -type f ! -name "*pkg-info.txt" -print`)
         for env_file in ${env_files[@]}; do
             # link the files
             local destfile=$ENVDIR/$env_file
             local srcfile=$srcdir/$env_file
             mkdir -p `dirname $destfile`
-            ln -s -f $srcfile $destfile
+            ln -sf $srcfile $destfile
         done
     done
 
     for need in ${runenv[@]}; do
         echo "Adding $need to env"
-        local srcdir=$bin_store_dir/$need
+        local srcdir=`realpath $pkg_link_dir/$need`
         local env_files=(`cd $srcdir && find . -type f ! -name "*pkg-info.txt" -print`)
         for env_file in ${env_files[@]}; do
             # link the files
             local destfile=$ENVDIR/$env_file
             local srcfile=$srcdir/$env_file
             mkdir -p `dirname $destfile`
-            ln -f $srcfile $destfile
+            ln -sf $srcfile $destfile
         done
     done
 
@@ -227,7 +252,7 @@ build_recipe(){
     mkdir -p $SCRIPTDIR
 
     #define variables that the recipe functions will use
-    PKGDST=$BUILDDIR/"$recipe_name-pkgdst"
+    PKGDST=$bin_store_dir/$recipe_name
     rm -rf $PKGDST
     mkdir -p $PKGDST
 
@@ -287,16 +312,14 @@ build_recipe(){
     echo -e "$info_str" > $info_file
 
     # delete the pkgdst for the old package if there was one
-    tmp_PKGDST=${old_PKGDST}-old
-    if [ -d $old_PKGDST ]; then
-        # Keep the old one around in case moving goes wrong
-        echo "Moving bin dir $old_PKGDST to dest $tmp_PKGDST"
-        mv -f $old_PKGDST $tmp_PKGDST
+    if [ -d $pkg_backup_dir ]; then
+        echo "Deleting backup dir $pkg_backup_dir"
+        rm -rf $pkg_backup_dir
     fi
-    echo "Moving bin dir $PKGDST to dest $old_PKGDST"
-    mv -f $PKGDST $old_PKGDST
-    # We've moved, so delete the old one
-    rm -rf $tmp_PKGDST
+
+    # Add the symlink to the link dir
+    echo "Linking built recipe $PKGDST -> $pkg_link_dir"
+    ln -sf $PKGDST $pkg_link_dir/
 
     echo "Deleting build dir ($BUILDDIR)"
     rm -rf $BUILDDIR

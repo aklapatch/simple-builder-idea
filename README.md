@@ -17,6 +17,8 @@ The goal is basically to be a `makepkg`-like package builder for Linux-like syst
 - (if necessary) bootstrap a statically linked compiler if necessary
 
 ## TODO:
+- Bootstrap gcc 4.9.4 from musl, and other sources and the system compiler, try to link everything statically use the musl gcc and the -static flags where possible
+- Install packages directly to the bin-store. If they are installed in the builds dir first that can cause problems.
 - implement env
     - Add PATH entries
     - bootstrap gcc
@@ -32,7 +34,6 @@ The goal is basically to be a `makepkg`-like package builder for Linux-like syst
             - bash?
             - make
 - Implement checksum adding through the tool and checksum checking
-- add xxhsum.
 - Add caching for config/build/package, etc.
 
 ## recipe format
