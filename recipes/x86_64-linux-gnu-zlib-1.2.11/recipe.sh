@@ -1,28 +1,29 @@
-name=make
-ver=4.4
+name=zlib
+ver=1.2.11
 rev=1
 desc=''
 arch=x86_64
-platform=mingw-w64
+platform=linux-musl
 
 license=
-url=https://ftp.gnu.org/gnu/$name
-
+# Borrow from ubuntu servers since I can't find the old versions of some things.
+url=http://archive.ubuntu.com/ubuntu/pool/main/z/
 # Environment/Tools needed to run+build the tool
-env=()
+runenv=(x86_64-linux-musl-1.2.3)
 # Tools only needed to build the package, not run it.
 buildenv=()
 
 conflicts=()
 
-srcs=("$url/$name-$ver.tar.gz")
+srcs=("$url/$name/${name}_$ver.dfsg.orig.tar.xz")
 
 # source sha checksums, leave blank to skip
 srcsums=('') 
 
 configure(){
     cd $name-$ver/
-    ./configure --prefix=$PKGDST
+    export CC="$ENVDIR/bin/musl-gcc -static "
+    ./configure --prefix=$PKGDST --static
 }
 
 build(){

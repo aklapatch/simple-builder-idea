@@ -48,6 +48,7 @@ print_added(){
     find . -maxdepth 1 -print
 }
 
+
 import_recipe(){
     # Source the recipe, and add it to the built-in recipe dir
     local recipe="${1?Please provide a recipe path to import}"
@@ -83,7 +84,21 @@ import_recipe(){
     # TODO: add local file sources from recipe to this dir too
     # TODO: delete all files in the old recipe dir
     install -D $recipe $old_recipe
-    bold_echo "Copied recipe"
+    bold_echo "Copied recipe $recipe_name"
+}
+
+# import all the in this folder
+bulk_import(){
+    # TODO: add error checking to see if a recipe is properly formed
+    local dir=${1?Missing recipe dir!}
+    if ! [ -d $dir ]; then
+        echo "$dir is not a directory!"
+        exit 1
+    fi
+    
+    bold_echo "Bulk importing from $dir"
+    local script=`realpath $0`
+    find $dir -iname "*recipe.sh" -exec $script --import-recipe {} \;
 }
 
 # Dump command as a script, then run it.
@@ -339,6 +354,8 @@ usage(){
     echo "      Imports <recipe-path> into the installed recipes"
     echo "  --add <pkg-name>"
     echo "      Adds <pkg-name> to the build store if the build succeeds"
+    echo "  --bulk-import <dir>"
+    echo "      Adds every recipe.sh file recursively to the tool"
     echo "  --help"
     echo "      Shows this help"
 }
@@ -358,6 +375,9 @@ while [ $# -gt 0 ]; do
     elif [[ "$1" == "--import-recipe" ]]; then
         shift
         import_recipe $1
+    elif [[ "$1" == "--bulk-import" ]]; then
+        shift
+        bulk_import $1
     elif [[ "$1" == "--add" ]]; then
         shift
         build_recipe $1 ""

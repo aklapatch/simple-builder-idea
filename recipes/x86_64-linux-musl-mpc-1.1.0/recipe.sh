@@ -22,8 +22,7 @@ srcsums=('')
 
 configure(){
     cd $name-$ver/
-    export CC=$ENVDIR/bin/musl-gcc
-    export CFLAGS=" -static "
+    export CC="$ENVDIR/bin/musl-gcc -static"
     ./configure --enable-static --disable-shared --prefix=$PKGDST --with-gmp=$ENVDIR --with-mpfr=$ENVDIR
 }
 

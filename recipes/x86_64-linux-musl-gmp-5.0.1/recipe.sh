@@ -21,8 +21,7 @@ srcs=("$url/gmp-$ver.tar.gz")
 srcsums=('') 
 
 configure(){
-    export CC=$ENVDIR/bin/musl-gcc
-    export CFLAGS=" -static "
+    export CC="$ENVDIR/bin/musl-gcc -static "
     cd $name-$ver/
     ./configure --enable-static --disable-shared --prefix=$PKGDST
 }

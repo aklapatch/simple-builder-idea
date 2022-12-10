@@ -1,28 +1,30 @@
-name=binutils
-ver=2.39
+name=isl
+ver=0.14
 rev=1
 desc=''
 arch=x86_64
-platform=mingw-w64
+platform=linux-musl
 
 license=
-url=https://ftp.gnu.org/gnu/$name
+url=https://isl.gforge.inria.fr/
 
 # Environment/Tools needed to run+build the tool
-env=()
+runenv=($arch-$platform-1.2.3 $arch-$platform-gmp-5.0.1)
 # Tools only needed to build the package, not run it.
 buildenv=()
 
 conflicts=()
 
-srcs=("$url/$name-$ver.tar.xz")
+srcs=("https://libisl.sourceforge.io/$name-$ver.tar.xz")
 
 # source sha checksums, leave blank to skip
 srcsums=('') 
 
 configure(){
     cd $name-$ver/
-    ./configure --prefix=$PKGDST
+
+    export CC="$ENVDIR/bin/musl-gcc -static "
+    ./configure --prefix=$PKGDST --with-gmp-prefix=$ENVDIR --enable-static --disable-shared
 }
 
 build(){

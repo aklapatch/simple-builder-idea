@@ -1,15 +1,15 @@
 name=isl
-ver=0.24
+ver=0.14
 rev=1
 desc=''
 arch=x86_64
-platform=mingw-w64
+platform=linux-gnu
 
 license=
 url=https://isl.gforge.inria.fr/
 
 # Environment/Tools needed to run+build the tool
-env=()
+runenv=($arch-$platform-gmp-5.0.1)
 # Tools only needed to build the package, not run it.
 buildenv=()
 
@@ -22,7 +22,8 @@ srcsums=('')
 
 configure(){
     cd $name-$ver/
-    ./configure --prefix=$PKGDST --enable-static --disable-shared
+
+    ./configure --prefix=$PKGDST --with-gmp-prefix=$ENVDIR --enable-static --disable-shared
 }
 
 build(){
