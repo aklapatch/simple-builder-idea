@@ -21,7 +21,12 @@ srcsums=('')
 
 configure(){
     cd $name-$ver/
-    ./configure --prefix=$PKGDST --host x86_64-linux --build x86_64-linux 
+    ./configure --prefix=$PKGDST \
+        --host x86_64-linux-gnu \
+        --target x86_64-linux-gnu \
+        --disable-nls \
+        --enable-deterministic-archives \
+        --disable-multilib
 }
 
 check(){

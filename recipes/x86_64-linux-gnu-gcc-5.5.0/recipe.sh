@@ -1,5 +1,5 @@
 name=gcc
-ver=4.7.4
+ver=5.5.0
 rev=1
 desc=''
 arch=x86_64
@@ -24,19 +24,22 @@ configure(){
     cd $name-$ver/
     ./configure \
         --prefix=$PKGDST \
-        CFLAGS="-pipe -static" \
         --enable-static \
+        --disable-lto \
         --disable-multilib \
         --disable-multiarch \
+        --disable-libmudflap \
+        --disable-libssp \
+        --disable-nls \
         --disable-shared \
         --with-mpfr=$ENVDIR \
         --with-mpc=$ENVDIR \
         --with-gmp=$ENVDIR \
         --with-isl=$ENVDIR \
-        --enable-languages=c \
-        --disable-build-with-cxx \
-        --disable-build-poststage1-with-cxx \
+        --enable-languages=c,c++ \
+        --disable-libgomp \
         --host x86_64-linux --build x86_64-linux \
+        --disable-libquadmath --disable-decimal-float --disable-fixed-point \
         --disable-host-shared \
         --with-boot-ldflags=-static --with-stage1-ldflags=-static
 }
